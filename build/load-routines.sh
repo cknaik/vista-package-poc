@@ -26,17 +26,22 @@ echo "Copying routines from ${ROUTINE_DIR} to ${IRIS_HOST}:${REMOTE_DIR}"
 ssh -o StrictHostKeyChecking=accept-new "ubuntu@${IRIS_HOST}" "mkdir -p ${REMOTE_DIR}"
 scp -o StrictHostKeyChecking=accept-new "${ROUTINE_DIR}"/*.m "ubuntu@${IRIS_HOST}:${REMOTE_DIR}/"
 
+echo "Copying routines into the IRIS container's filesystem"
+ssh -o StrictHostKeyChecking=accept-new "ubuntu@${IRIS_HOST}" \
+  "docker exec iris mkdir -p ${REMOTE_DIR} && docker cp ${REMOTE_DIR}/. iris:${REMOTE_DIR}/"
+
 echo "Loading routines into IRIS namespace ${IRIS_NAMESPACE}"
-ssh -o StrictHostKeyChecking=accept-new "ubuntu@${IRIS_HOST}" bash <<EOF
-iris session iris -U "${IRIS_NAMESPACE}" <<'INNEREOF'
+ssh -o StrictHostKeyChecking=accept-new "ubuntu@${IRIS_HOST}" \
+  "docker exec -i iris iris session iris" <<EOF
+zn "${IRIS_NAMESPACE}"
 set sc = \$System.OBJ.ImportDir("${REMOTE_DIR}", "*.m", "ck", .errorlog, 1)
 if sc '= 1 write "Load FAILED",!  quit
 write "Load succeeded",!
 halt
-INNEREOF
 EOF
 
-echo "Cleaning up staging directory on ${IRIS_HOST}"
+echo "Cleaning up staging directories"
 ssh -o StrictHostKeyChecking=accept-new "ubuntu@${IRIS_HOST}" "rm -rf ${REMOTE_DIR}"
+ssh -o StrictHostKeyChecking=accept-new "ubuntu@${IRIS_HOST}" "docker exec iris rm -rf ${REMOTE_DIR}"
 
 echo "Done."

@@ -15,11 +15,11 @@ IRIS_NAMESPACE="${IRIS_NAMESPACE:-USER}"
 
 echo "Running smoke test against ${IRIS_HOST}/${IRIS_NAMESPACE}"
 
-OUTPUT=$(ssh -o StrictHostKeyChecking=accept-new "ubuntu@${IRIS_HOST}" bash <<EOF
-iris session iris -U "${IRIS_NAMESPACE}" <<'INNEREOF'
+OUTPUT=$(ssh -o StrictHostKeyChecking=accept-new "ubuntu@${IRIS_HOST}" \
+  "docker exec -i iris iris session iris" <<EOF
+zn "${IRIS_NAMESPACE}"
 do GREET^XYZFOO("SmokeTest")
 halt
-INNEREOF
 EOF
 )
 
