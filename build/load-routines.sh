@@ -36,4 +36,7 @@ halt
 INNEREOF
 EOF
 
+echo "Cleaning up staging directory on ${IRIS_HOST}"
+ssh -o StrictHostKeyChecking=accept-new "ubuntu@${IRIS_HOST}" "rm -rf ${REMOTE_DIR}"
+
 echo "Done."
