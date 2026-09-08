@@ -5,28 +5,35 @@
 # Called by Jenkins after a merge to main. Can also be run manually from a
 # dev VM for local testing before pushing.
 #
-# Requires: IRIS_HOST, IRIS_PORT, IRIS_NAMESPACE, IRIS_USER, IRIS_PASSWORD
-# set as environment variables (Jenkins pulls these from its credentials store).
+# IMPORTANT: the `iris` CLI only exists ON the IRIS EC2 instance itself, not
+# on Jenkins or the dev VMs - so this script SSHs into IRIS_HOST and runs
+# the load there, rather than assuming a local `iris` command.
+#
+# Requires: IRIS_HOST (private IP of the IRIS EC2 instance) as an env var,
+# and SSH key access to that host as the `ubuntu` user. In Jenkins this
+# comes from the 'iris-ssh-key' SSH credential (see Jenkinsfile, which wraps
+# this script in an sshagent() block) - no key files are stored on disk.
 
 set -euo pipefail
 
 IRIS_HOST="${IRIS_HOST:?Set IRIS_HOST}"
-IRIS_PORT="${IRIS_PORT:-1972}"
 IRIS_NAMESPACE="${IRIS_NAMESPACE:-USER}"
-IRIS_USER="${IRIS_USER:?Set IRIS_USER}"
-IRIS_PASSWORD="${IRIS_PASSWORD:?Set IRIS_PASSWORD}"
 
 ROUTINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../routines" && pwd)"
+REMOTE_DIR="/tmp/routines-import"
 
-echo "Loading routines from ${ROUTINE_DIR} into ${IRIS_HOST}:${IRIS_PORT}/${IRIS_NAMESPACE}"
+echo "Copying routines from ${ROUTINE_DIR} to ${IRIS_HOST}:${REMOTE_DIR}"
+ssh -o StrictHostKeyChecking=accept-new "ubuntu@${IRIS_HOST}" "mkdir -p ${REMOTE_DIR}"
+scp -o StrictHostKeyChecking=accept-new "${ROUTINE_DIR}"/*.m "ubuntu@${IRIS_HOST}:${REMOTE_DIR}/"
 
-# Uses the IRIS command-line session to run ObjectScript non-interactively.
-# $System.OBJ.ImportDir() imports every routine file in the directory in one call.
-iris session iris -U "${IRIS_NAMESPACE}" <<EOF
-set sc = \$System.OBJ.ImportDir("${ROUTINE_DIR}", "*.m", "ck", .errorlog, 1)
+echo "Loading routines into IRIS namespace ${IRIS_NAMESPACE}"
+ssh -o StrictHostKeyChecking=accept-new "ubuntu@${IRIS_HOST}" bash <<EOF
+iris session iris -U "${IRIS_NAMESPACE}" <<'INNEREOF'
+set sc = \$System.OBJ.ImportDir("${REMOTE_DIR}", "*.m", "ck", .errorlog, 1)
 if sc '= 1 write "Load FAILED",!  quit
 write "Load succeeded",!
 halt
+INNEREOF
 EOF
 
 echo "Done."
