@@ -8,11 +8,11 @@ Sample/fake VistA routines used to validate the CI/CD pipeline described in
 - One feature branch per change: `feature/<dev>-<change-description>`
 - Open a PR against `main`
 - Merging to `main` triggers Jenkins (polls this repo every 5 minutes) to
-  deploy `routines/*.m` into the shared VistA/IRIS dev instance
+  deploy `routines/*.int` or `routines/*.m` into the shared VistA/IRIS dev instance
 
 ## Layout
 
-- `routines/` — the actual package source (.m files)
+- `routines/` — the actual package source (`.int` or `.m` files - both accepted, normalized to `.int` automatically at deploy time since that's what IRIS's import expects)
 - `build/load-routines.sh` — deploy step Jenkins runs on every merge to `main`
 - `build/export-kids.sh` — sprint-end KIDS build export (manual/scheduled, not part of continuous deploy)
 - `Jenkinsfile` — pipeline definition
