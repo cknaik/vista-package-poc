@@ -53,14 +53,41 @@ ssh -o StrictHostKeyChecking=accept-new "ubuntu@${IRIS_HOST}" \
   "docker exec iris mkdir -p ${REMOTE_DIR} && docker cp ${REMOTE_DIR}/. iris:${REMOTE_DIR}/"
 
 echo "Loading routines into IRIS namespace ${IRIS_NAMESPACE}"
-ssh -o StrictHostKeyChecking=accept-new "ubuntu@${IRIS_HOST}" \
-  "docker exec -i iris iris session iris" <<EOF
-zn "${IRIS_NAMESPACE}"
-set sc = \$System.OBJ.ImportDir("${REMOTE_DIR}", "*.int", "ck", .errorlog, 1)
-if sc '= 1 write "Load FAILED",!  quit
-write "Load succeeded",!
-halt
-EOF
+# $System.OBJ.Load() and ImportDir() both reject plain .mac/.int text with
+# "Unknown file type" (ERROR #5840) on this IRIS version/build, despite
+# documentation suggesting they should work - confirmed by direct testing.
+# The %Routine object API bypasses that file-type auto-detection entirely:
+# we explicitly create a routine of a known type and write its lines in,
+# rather than asking IRIS to guess the type from the file.
+LOAD_OUTPUT=$({
+    echo "zn \"${IRIS_NAMESPACE}\""
+    echo "set anyfail = 0"
+    for f in "${STAGING_DIR}"/*.int; do
+        fname="$(basename "$f")"
+        cat <<ROUTINELOAD
+set rtn = ##class(%Routine).%New("${fname}")
+do rtn.Clear()
+set stream = ##class(%Stream.FileCharacter).%New()
+do stream.LinkToFile("${REMOTE_DIR}/${fname}")
+while 'stream.AtEnd { do rtn.WriteLine(stream.ReadLine()) }
+set sc = rtn.Save()
+if sc '= 1 write "Load FAILED: ${fname}",!  set anyfail = 1
+set sc2 = rtn.Compile()
+if sc2 '= 1 write "Compile FAILED: ${fname}",!  set anyfail = 1
+ROUTINELOAD
+    done
+    echo "if anyfail write \"One or more routines failed\",!  quit"
+    echo "write \"Load succeeded\",!"
+    echo "halt"
+} | ssh -o StrictHostKeyChecking=accept-new "ubuntu@${IRIS_HOST}" \
+  "docker exec -i iris iris session iris")
+
+echo "${LOAD_OUTPUT}"
+
+if echo "${LOAD_OUTPUT}" | grep -q "Load FAILED\|Compile FAILED\|One or more routines failed"; then
+    echo "One or more routines failed to load/compile - see output above."
+    exit 1
+fi
 
 echo "Cleaning up staging directories"
 ssh -o StrictHostKeyChecking=accept-new "ubuntu@${IRIS_HOST}" "rm -rf ${REMOTE_DIR}"

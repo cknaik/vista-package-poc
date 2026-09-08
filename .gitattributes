@@ -1,0 +1,9 @@
+# Routine source, shell scripts, and the Jenkinsfile must always use LF
+# line endings, regardless of what OS or Git config checks them out.
+# IRIS's routine import (and any shell script) can fail or misbehave with
+# Windows-style CRLF endings, which Git on Windows adds by default.
+
+*.int text eol=lf
+*.m   text eol=lf
+*.sh  text eol=lf
+Jenkinsfile text eol=lf
