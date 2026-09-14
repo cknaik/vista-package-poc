@@ -15,10 +15,20 @@ FAILED=0
 echo "Checking routines in ${ROUTINE_DIR}"
 
 shopt -s nullglob
+declare -A SEEN_NAMES
 for file in "${ROUTINE_DIR}"/*.int "${ROUTINE_DIR}"/*.m; do
     name=$(basename "${file%.*}")
     ext="${file##*.}"
     first_line=$(head -n 1 "$file")
+
+    # Check 0: same routine name must not exist under both .int and .m -
+    # the deploy script silently prefers one, which can deploy stale code
+    # without any error. Fail loudly here instead.
+    if [ -n "${SEEN_NAMES[$name]:-}" ]; then
+        echo "FAIL: ${name} exists as both .int and .m - remove one (found: ${SEEN_NAMES[$name]} and ${ext})"
+        FAILED=1
+    fi
+    SEEN_NAMES[$name]="$ext"
 
     # Check 1: the routine's declared name (first token on line 1) must
     # match the filename - a common copy/paste mistake in MUMPS routines.
