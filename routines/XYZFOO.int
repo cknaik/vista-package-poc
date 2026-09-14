@@ -9,5 +9,5 @@ EN ;
  QUIT
  ;
 GREET(NAME) ;
- WRITE "Hello, "_NAME_"!",!
+ WRITE "Hello, "_NAME_"! (phase13-test1)",!
  QUIT
